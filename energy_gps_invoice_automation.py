@@ -6,40 +6,15 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
 import os
 import time
-import time,datetime
 import winreg
 import bu_alerts
 import logging
-from datetime import date
+from datetime import date,datetime
 from bu_config import get_config
 import sys
+import numpy as np
 
-today_date=date.today()
-# log progress --
-logfile = os.getcwd() + "\\Logs\\" +'Energy_GPS_AUTOMATION_Logfile'+str(today_date)+'.txt'
 
-logging.basicConfig(filename=logfile, filemode='w',
-                    format='%(asctime)s %(message)s')
-logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s [%(levelname)s] - %(message)s',
-    filename=logfile)
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-mydate = datetime.datetime.now()
-month = mydate.strftime("%b")
-year = datetime.date.today().year
-path = os.getcwd() + "\\Download"
-REG_PATH = r'Software\CutePDF Writer'
-site = 'https://biourja.sharepoint.com'
-path1 = "/BiourjaPower/_api/web/GetFolderByServerRelativeUrl"
-path2= "Shared%20Documents/Power%20Reference/Power_Invoices/Energy_GPS/"
-# path2= "Shared Documents/Vendor Research/Enverus(PRT)/ERCOT"
-temp_path='https://biourja.sharepoint.com/BiourjaPower/Shared%20Documents/Power%20Reference/Power_Invoices/Energy_GPS'
-locations_list=[]
-body = ''
 
 
 def remove_existing_files(files_location):
@@ -68,33 +43,7 @@ def set_reg(name, value):
         return True
     except WindowsError:
         return False
-fp=webdriver.FirefoxProfile()
-mime_types=['application/pdf'
-            ,'text/plain',
-            'application/vnd.ms-excel',
-            'test/csv',
-            'application/csv',
-            'text/comma-separated-values','application/download','application/octet-stream'
-            ,'binary/octet-stream'
-            ,'application/binary'
-            ,'application/x-unknown']
-fp.set_preference('browser.download.folderList',2)
-fp.set_preference('browser.download.manager.showWhenStarting',False)
-fp.set_preference('browser.download.dir',path)
-fp.set_preference('browser.helperApps.neverAsk.saveToDisk',','.join(mime_types))
-# fp.set_preference('pdfjs.disabled',True)
-# fp.set_preference('print.always_print_silent', True)
-fp.set_preference('print_printer', 'CutePDF Writer')
-fp.set_preference("print.always_print_silent", True)
-fp.set_preference("print.show_print_progress", True)
-fp.set_preference('print.save_as_pdf.links.enabled', True)
-fp.set_preference("pdjs.disabled", True)
-fp.set_preference('print.printer_CutePDF.print_to_file', True)
-fp.set_preference('print.printer_CutePDF.print_to_file.print_to_filename',
-                   "testprint.pdf")
 
-driver=webdriver.Firefox(executable_path=GeckoDriverManager().install(),firefox_profile=fp)
-# driver = webdriver.Chrome(executable_path=executable_path,options=chromeOptions)
 
 def login_and_download():  
     '''This function downloads file from the website'''
@@ -180,8 +129,7 @@ def shp_file_upload(s):
             p = s.post(f"{site}{path1}('{path2}')/Files/add(url='{fileToUpload}',overwrite=true)", data=content, headers=headers)
             nl = '<br>'
             body += (f'{fileToUpload} successfully uploaded, {nl} Attached link for the same:-{nl}{temp_path}{nl}')
-
-        print(f'{fileToUpload} uploaded successfully')
+            print(f'{fileToUpload} uploaded successfully')
     
         print(f'{job_name} executed succesfully')
         return p   
@@ -191,40 +139,111 @@ def shp_file_upload(s):
 
 def main():
     try:
-        remove_existing_files(files_location)
-        login_and_download()
+        no_of_rows=0
+        Database=""
+        log_json='[{"JOB_ID": "'+str(job_id)+'","CURRENT_DATETIME": "'+str(datetime.now())+'"}]'
+        bu_alerts.bulog(process_name=processname,database=Database,status='Started',table_name='',
+            row_count=no_of_rows, log=log_json, warehouse='ITPYTHON_WH',process_owner=process_owner)
+        # remove_existing_files(files_location)
+        # login_and_download()
         s=connect_to_sharepoint()
         shp_file_upload(s)
         locations_list.append(logfile)
+        bu_alerts.bulog(process_name=processname,database=Database,status='Completed',table_name='',
+            row_count=no_of_rows, log=log_json, warehouse='ITPYTHON_WH',process_owner=process_owner)  
         bu_alerts.send_mail(receiver_email = receiver_email,mail_subject =f'JOB SUCCESS - {job_name}',mail_body = f'{body}{job_name} completed successfully, Attached PDF and Logs',attachment_location = logfile)
     except Exception as e:
+        log_json='[{"JOB_ID": "'+str(job_id)+'","CURRENT_DATETIME": "'+str(datetime.now())+'"}]'
+        bu_alerts.bulog(process_name= processname,database=Database,status='Failed',table_name='',
+            row_count=no_of_rows, log=log_json, warehouse='ITPYTHON_WH',process_owner=process_owner)
         logging.exception(str(e))
         bu_alerts.send_mail(receiver_email = receiver_email,mail_subject =f'JOB FAILED -{job_name}',mail_body = f'{job_name} failed, Attached logs',attachment_location = logfile)
                 
 if __name__ == "__main__":
-    logging.info("Execution Started")
-    time_start=time.time()
-    directories_created=["Download","Logs"]
-    for directory in directories_created:
-        path3 = os.path.join(os.getcwd(),directory)  
-        try:
-            os.makedirs(path3, exist_ok = True)
-            print("Directory '%s' created successfully" % directory)
-        except OSError as error:
-            print("Directory '%s' can not be created" % directory)
+    try:
+        logging.info("Execution Started")
+        time_start=time.time()
+        today_date=date.today()
+        # log progress --
+        logfile = os.getcwd() + "\\Logs\\" +'Energy_GPS_AUTOMATION_Logfile'+str(today_date)+'.txt'
 
-    files_location=os.getcwd() + "\\Download"
-    Project_name="ENERGY_GPS_INVOICE_AUTOMATION"
-    Table_name="ENERGY_GPS_INVOICE_AUTOMATION"
-    credential_dict = get_config('ENERGY_GPS_INVOICE_AUTOMATION','ENERGY_GPS_INVOICE_AUTOMATION')
-    username = credential_dict['USERNAME'].split(';')[0]
-    password = credential_dict['PASSWORD'].split(';')[0]
-    sp_username = credential_dict['USERNAME'].split(';')[1]
-    sp_password =  credential_dict['PASSWORD'].split(';')[1]
-    receiver_email = credential_dict['EMAIL_LIST']
-    # receiver_email ='yashn.jain@biourja.com'
-    job_name='ENERGY_GPS_INVOICE_AUTOMATION'
-   
-    main()
-    time_end=time.time()
-    logging.info(f'It takes {time_start-time_end} seconds to run')      
+        logging.basicConfig(filename=logfile, filemode='w',
+                            format='%(asctime)s %(message)s')
+        logging.basicConfig(
+            level=logging.INFO, 
+            format='%(asctime)s [%(levelname)s] - %(message)s',
+            filename=logfile)
+
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        directories_created=["Download","Logs"]
+        for directory in directories_created:
+            path3 = os.path.join(os.getcwd(),directory)  
+            try:
+                os.makedirs(path3, exist_ok = True)
+                print("Directory '%s' created successfully" % directory)
+            except OSError as error:
+                print("Directory '%s' can not be created" % directory)
+
+        files_location=os.getcwd() + "\\Download"
+        project_name="ENERGY_GPS_INVOICE_AUTOMATION"
+        table_name="ENERGY_GPS_INVOICE_AUTOMATION"
+        credential_dict = get_config('ENERGY_GPS_INVOICE_AUTOMATION','ENERGY_GPS_INVOICE_AUTOMATION')
+        username = credential_dict['USERNAME'].split(';')[0]
+        password = credential_dict['PASSWORD'].split(';')[0]
+        sp_username = credential_dict['USERNAME'].split(';')[1]
+        sp_password =  credential_dict['PASSWORD'].split(';')[1]
+        receiver_email = credential_dict['EMAIL_LIST']
+        # receiver_email ='yashn.jain@biourja.com'
+        job_name=credential_dict['PROJECT_NAME']
+        job_id=np.random.randint(1000000,9999999)
+        processname = credential_dict['PROJECT_NAME']
+        process_owner = credential_dict['IT_OWNER']
+        mydate = datetime.now()
+        month = mydate.strftime("%b")
+        year = date.today().year
+        path = os.getcwd() + "\\Download"
+        REG_PATH = r'Software\CutePDF Writer'
+        site = 'https://biourja.sharepoint.com'
+        path1 = "/BiourjaPower/_api/web/GetFolderByServerRelativeUrl"
+        path2= "Shared%20Documents/Power%20Reference/Power_Invoices/Energy_GPS/"
+        # path2= "Shared Documents/Vendor Research/Enverus(PRT)/ERCOT"
+        temp_path='https://biourja.sharepoint.com/BiourjaPower/Shared%20Documents/Power%20Reference/Power_Invoices/Energy_GPS'
+        locations_list=[]
+        body = ''
+        fp=webdriver.FirefoxProfile()
+        mime_types=['application/pdf'
+                    ,'text/plain',
+                    'application/vnd.ms-excel',
+                    'test/csv',
+                    'application/csv',
+                    'text/comma-separated-values','application/download','application/octet-stream'
+                    ,'binary/octet-stream'
+                    ,'application/binary'
+                    ,'application/x-unknown']
+        fp.set_preference('browser.download.folderList',2)
+        fp.set_preference('browser.download.manager.showWhenStarting',False)
+        fp.set_preference('browser.download.dir',path)
+        fp.set_preference('browser.helperApps.neverAsk.saveToDisk',','.join(mime_types))
+        # fp.set_preference('pdfjs.disabled',True)
+        # fp.set_preference('print.always_print_silent', True)
+        fp.set_preference('print_printer', 'CutePDF Writer')
+        fp.set_preference("print.always_print_silent", True)
+        fp.set_preference("print.show_print_progress", True)
+        fp.set_preference('print.save_as_pdf.links.enabled', True)
+        fp.set_preference("pdjs.disabled", True)
+        fp.set_preference('print.printer_CutePDF.print_to_file', True)
+        fp.set_preference('print.printer_CutePDF.print_to_file.print_to_filename',
+                        "testprint.pdf")
+
+        driver=webdriver.Firefox(executable_path=GeckoDriverManager().install(),firefox_profile=fp)
+        # driver = webdriver.Chrome(executable_path=executable_path,options=chromeOptions)
+        main()
+        time_end=time.time()
+        logging.info(f'It takes {time_start-time_end} seconds to run')  
+    except Exception as e:
+        logging.exception(str(e))
+        bu_alerts.send_mail(receiver_email = receiver_email,mail_subject =f'JOB FAILED -{job_name}',mail_body = f'{job_name} failed in __main__, Attached logs',attachment_location = logfile)
+    
+    
