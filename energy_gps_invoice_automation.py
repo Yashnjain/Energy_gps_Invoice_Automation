@@ -1,18 +1,18 @@
-import sharepy
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.firefox import GeckoDriverManager
-from selenium import webdriver
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.common.by import By
 import os
+import sys
 import time
 import winreg
-import bu_alerts
+import sharepy
 import logging
-from datetime import date,datetime
-from bu_config import get_config
-import sys
+import bu_alerts
 import numpy as np
+from selenium import webdriver
+from bu_config import get_config
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.firefox import GeckoDriverManager
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.common.by import By
+from datetime import date,datetime
 
 
 
